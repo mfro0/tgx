@@ -25004,7 +25004,7 @@ const uint16_t buddha_face[47631] PROGMEM = {
 
 
 // mesh info for object buddha (with tag [ | g Group47867 | usemtl Acier_-_Satiné])
-const tgx::Mesh3D<tgx::RGB32> buddha = 
+const tgx::Mesh3D<tgx::RGB565> buddha = 
     {
     1, // version/id
     

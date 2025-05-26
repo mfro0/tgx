@@ -24,7 +24,7 @@
 #ifndef _TGX_FONTS_H_
 #define _TGX_FONTS_H_
 
-#include <stdint.h>
+#include <cstdint>
 #include "Misc.h"
 #include "Vec2.h"
 #include "Box2.h"
