@@ -39,11 +39,13 @@
 #include "tgx.h" 
 
 // the mesh we will draw. 
-#include "buddha.h" 
+#include "buddha.h"
+#include <gem.h>
 
+#include <iostream>
 
-const int LX = 600; // image dimension
-const int LY = 800; //
+const int LX = 400; // image dimension
+const int LY = 400; //
 
 tgx::RGB565 im_buffer[LX * LY];                  // image memory buffer...
 tgx::Image<tgx::RGB565> im(im_buffer, LX, LY);   // ...and associated tgx::Image object that encapsulated it. 
@@ -54,7 +56,7 @@ tgx::Renderer3D<tgx::RGB565> renderer;           // the 3D renderer (loads all s
 
 
 int main()
-    {
+{
     // setup the 3D renderer.
     renderer.setViewportSize(LX, LY);   // viewport = image...
     renderer.setOffset(0, 0);           //  ...so no offset
@@ -65,20 +67,59 @@ int main()
     renderer.setShaders(tgx::SHADER_GOURAUD); // draw with Gouraud shaders
 
     // draw the mesh 
-    //im.clear(tgx::RGB565);  // clear the image
+    im.clear(tgx::RGB565_Gray);  // clear the image
     renderer.clearZbuffer(); // and the zbuffer.
     renderer.setModelPosScaleRot({ 0, 0.5f, -36 }, { 13,13,13 }, 0); // set the position of the mesh
-    renderer.drawMesh(&buddha, false); // and then draw it ! 
-
-    // display on the screen using the CImg library.
-    //cimg_library::CImg<unsigned char> cimg_im((const unsigned char*)im_buffer, 4, LX, LY, 1); // create a temporary CImg image
-    //cimg_im.permute_axes("yzcx"); // de-interleave the image before we can display it
-    //cimg_library::CImgDisplay disp(cimg_im); // Display the image in a CImg window. 
-    //while (!disp.is_closed())
-      //  { // wait until window is closed. 
-      //  cimg_library::cimg::sleep(50);
-      //  }
-
-    }
+    renderer.drawMesh(&buddha, false); // and then draw it !
+    
+    short ap_id = appl_init();
+    
+    short work_in[10], work_out[57];
+    
+    for (short i = 1; i < 10; i++)
+        work_in[i] = 0;
+    work_in[0] = 1;
+    work_in[10] = 2;
+    
+    short vdi_handle;
+    
+    v_opnvwk(work_in, &vdi_handle, work_out);
+    
+    short w = work_out[0] + 1;
+    short h = work_out[1] + 1;
+    
+    std::cout << "width=" << w <<
+        std::endl << "height=" << h << std::endl;
+    
+    MFDB src_mfdb = {
+        .fd_addr= im_buffer,
+        .fd_w = LX,
+        .fd_h = LY,
+        .fd_wdwidth = (LX + 15) / 16,
+        .fd_stand = 0,
+        .fd_nplanes = 16,
+        .fd_r1 = 0,
+        .fd_r2 = 0,
+        .fd_r3 = 0
+    };
+    
+    
+    MFDB dst_mfdb = {
+        .fd_addr = NULL,
+        .fd_w = w,
+        .fd_h = h,
+        .fd_wdwidth = (w + 15) / 16,
+        .fd_stand = 0,
+        .fd_nplanes = 16,
+        .fd_r1 = 0,
+        .fd_r2 = 0,
+        .fd_r3 = 0
+    };
+    
+    short pxy[] = {0, 0, LX - 1, LY - 1, 0, 0, LX - 1, LY - 1};
+    vro_cpyfm(vdi_handle, S_ONLY, pxy, &src_mfdb, &dst_mfdb);
+    
+    // while (1);
+}
 
 /** en of file */
