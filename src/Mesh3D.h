@@ -161,8 +161,8 @@ namespace tgx
         uint16_t nb_vertices;           ///< Number of vertices in the vertex array.
         uint16_t nb_texcoords;          ///< Number of texture coordinates in the texcoord array.
         uint16_t nb_normals;            ///< Number of normal vectors in the normal array.
-        uint16_t nb_faces;              ///< Number of triangular faces in the mesh.
-        uint16_t len_face;              ///< Number of elements (uint16_t) in the face array.
+        uint32_t nb_faces;              ///< Number of triangular faces in the mesh.
+        uint32_t len_face;              ///< Number of elements (uint16_t) in the face array.
 
         const fVec3* vertice;           ///< Vertex array.
         const fVec2* texcoord;          ///< Texture coord array (nullptr if none).

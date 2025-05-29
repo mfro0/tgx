@@ -52,7 +52,8 @@ add_executable(${PROJECT_NAME} ${project_SRC} ${tgx_SRC})
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
 
 # override default behaviour and use R/G/B order to match CImg's color channels ordering. 
-#add_compile_definitions(TGX_RGB32_ORDER_BGR=0)
+add_compile_definitions(TGX_RGB32_ORDER_BGR=1)
+add_compile_definitions(TGX_RGBf_ORDER_BGR=1)
 
 # set the project as the default startup project in visual studio.
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT "${PROJECT_NAME}")
@@ -63,6 +64,9 @@ set(PREDEFINED_TARGETS_FOLDER "CustomTargets")
 
 target_link_libraries(${PROJECT_NAME} -lgem)
 
+# add Atari cross compiler include directories
+include_directories("/usr/m68k-atari-mintelf/include"
+)
 ###############################################################################
 #end of file
 ###############################################################################

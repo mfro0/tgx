@@ -1,7 +1,7 @@
 /********************************************************************************
  * @file buddhaOnCPU.cpp 
  *
- * Example: using the TGX to draw a 3D mesh (displayed using the CImg library).
+ * Example: using the TGX to draw a 3D mesh 
  * 
  * For Windows/Linuc/MacOS.
  *
@@ -31,15 +31,13 @@
  *******************************************************************************/
 
 
-// The CImg library is used only to create a window and display the image.
-// It is lightweight (single header file!) and cross-platform (Windows/Linux/MacOS)
-//#include "CImg.h" 
-
 // the tgx library. 
 #include "tgx.h" 
 
 // the mesh we will draw. 
 #include "buddha.h"
+#include <map>
+
 #include <gem.h>
 
 #include <iostream>
@@ -47,12 +45,184 @@
 const int LX = 400; // image dimension
 const int LY = 400; //
 
-tgx::RGB565 im_buffer[LX * LY];                  // image memory buffer...
-tgx::Image<tgx::RGB565> im(im_buffer, LX, LY);   // ...and associated tgx::Image object that encapsulated it. 
+tgx::RGB565 im_buffer[LX * LY];                     // image memory buffer...
+tgx::Image<tgx::RGB565> im(im_buffer, LX, LY);      // ...and associated tgx::Image object that encapsulated it. 
 
-float zbuffer[LX * LY];                         // z-buffer (same sie as the image)
+float zbuffer[LX * LY];                             // z-buffer (same sie as the image)
 
-tgx::Renderer3D<tgx::RGB565> renderer;           // the 3D renderer (loads all shaders). 
+tgx::Renderer3D<tgx::RGB565> renderer;              // the 3D renderer (loads all shaders).
+
+struct wh
+{
+    short w;
+    short h;
+};
+
+class Window;
+class GEMApplication;
+
+GEMApplication *theApplication;
+
+class GEMApplication
+{
+    short ap_id;
+    short work_in[11];
+    short work_out[57];
+    short vdi_handle;
+public:
+    GEMApplication()
+    {
+        ap_id = appl_init();
+        
+        
+        for (auto i = 1; i < 10; i++)
+            work_in[i] = 0;
+        work_in[0] = 1;
+        work_in[10] = 2;
+        
+        v_opnvwk(work_in, &vdi_handle, work_out);
+        theApplication = this;
+    }
+    
+    constexpr struct wh wh(void)
+    {
+        struct wh ret = {(short) (work_out[0] + 1), (short) (work_out[1] + 1)};
+        
+        return ret;
+    }
+    
+    
+    constexpr short vh() { return vdi_handle; }
+    std::map<short, Window> windows;    
+};
+
+class Window
+{
+    short handle;
+    
+    GRECT rect;
+    GRECT work;
+    GRECT old;
+    
+    int left;
+    int top;
+    
+    int doc_width;
+    int doc_height;
+    
+    bool open;
+    bool topped;
+    bool fulled;
+    
+    char name[200];
+    char info[200];
+    
+public:
+    Window(short kind, short x, short y, short w, short h) {
+        wind_calc(WC_BORDER, SIZER|MOVER, x, y, w, h, &x, &y, &w, &h);
+        handle = wind_create(kind, x, y, w, h);
+        wind_open(handle, x, y, w, h);
+        
+        open = true;
+        theApplication->windows.insert(std::pair<short, Window&>(handle, *this));
+                
+        std::cout << "Window::Window: window handle=" << handle << std::endl;
+    }
+    
+    ~Window()
+    {
+        if (open)
+        {
+            std::cout << "window was open" << std::endl;
+            wind_close(handle);
+            open = false;
+        } else
+            std::cout << "window was not open" << std::endl;
+        
+        wind_delete(handle);
+        std::cout << "Window destructor" << std::endl << std::flush;
+    }
+    
+    virtual void full(void) {
+        short x, y, w, h;
+        wind_set(handle, WF_FULLXYWH, x, y, w, h);
+    };
+    
+    virtual void size(short x, short y, short w, short h)
+    {
+        wind_set(handle, WF_WORKXYWH, x, y, w, h);
+    }
+    
+    virtual void draw(short x, short y, short w, short h)
+    {
+        std::cout << "Window::draw()" << std::endl << std::flush;
+    };
+    
+    virtual void clear(short x, short y, short w, short h)
+    {
+        
+    }
+    
+    virtual void scroll()
+    {
+        
+    }
+    
+    virtual void timer()
+    {
+        
+    };
+};
+
+class BuddhaWindow : public Window
+{
+public:
+    BuddhaWindow(short what, short x, short y, short w, short h) : Window(what, x, y, w, h)
+    {
+        std::cout << "BuddhaWindow constructor" << std::endl << std::flush;
+    }
+    
+    ~BuddhaWindow(){
+        std::cout << "BuddhaWindow destructor" << std::endl << std::flush;
+    }
+    
+    virtual void draw(short x, short y, short w, short h)
+    {
+        MFDB src_mfdb = {
+            .fd_addr= im_buffer,
+            .fd_w = LX,
+            .fd_h = LY,
+            .fd_wdwidth = (LX + 15) / 16,
+            .fd_stand = 0,
+            .fd_nplanes = 16,
+            .fd_r1 = 0,
+            .fd_r2 = 0,
+            .fd_r3 = 0
+        };
+        
+        
+        MFDB dst_mfdb = {
+            .fd_addr = NULL,
+            .fd_w = theApplication->wh().w,
+            .fd_h = theApplication->wh().h,
+            .fd_wdwidth = (short) ((theApplication->wh().w + 15) / 16),
+            .fd_stand = 0,
+            .fd_nplanes = 16,
+            .fd_r1 = 0,
+            .fd_r2 = 0,
+            .fd_r3 = 0
+        };
+        
+        short pxy[] = {
+            0,  20,       LX - 1, LY - 1,
+            100,  20, 100 + LX - 1, LY - 1
+        };
+        
+        vro_cpyfm(theApplication->vh(), S_ONLY, pxy, &src_mfdb, &dst_mfdb);
+        
+        std::cout << "BuddhaWindow::draw()" << std::endl << std::flush;
+    }
+};
 
 
 int main()
@@ -65,61 +235,19 @@ int main()
     renderer.setPerspective(45, ((float)LX) / LY, 1.0f, 100.0f);  // set the perspective projection matrix.     
     renderer.setMaterial(tgx::RGBf(0.85f, 0.55f, 0.25f), 0.2f, 0.7f, 0.8f, 64); // set material properties
     renderer.setShaders(tgx::SHADER_GOURAUD); // draw with Gouraud shaders
-
+    
     // draw the mesh 
     im.clear(tgx::RGB565_Gray);  // clear the image
     renderer.clearZbuffer(); // and the zbuffer.
     renderer.setModelPosScaleRot({ 0, 0.5f, -36 }, { 13,13,13 }, 0); // set the position of the mesh
     renderer.drawMesh(&buddha, false); // and then draw it !
     
-    short ap_id = appl_init();
     
-    short work_in[10], work_out[57];
+    GEMApplication ap;
+    BuddhaWindow wi(SIZER|MOVER, 0, 0, 50, 50);
+    wi.clear(0, 0, LX, LY);
+    wi.draw(0, 0, 200, 200);
     
-    for (short i = 1; i < 10; i++)
-        work_in[i] = 0;
-    work_in[0] = 1;
-    work_in[10] = 2;
-    
-    short vdi_handle;
-    
-    v_opnvwk(work_in, &vdi_handle, work_out);
-    
-    short w = work_out[0] + 1;
-    short h = work_out[1] + 1;
-    
-    std::cout << "width=" << w <<
-        std::endl << "height=" << h << std::endl;
-    
-    MFDB src_mfdb = {
-        .fd_addr= im_buffer,
-        .fd_w = LX,
-        .fd_h = LY,
-        .fd_wdwidth = (LX + 15) / 16,
-        .fd_stand = 0,
-        .fd_nplanes = 16,
-        .fd_r1 = 0,
-        .fd_r2 = 0,
-        .fd_r3 = 0
-    };
-    
-    
-    MFDB dst_mfdb = {
-        .fd_addr = NULL,
-        .fd_w = w,
-        .fd_h = h,
-        .fd_wdwidth = (w + 15) / 16,
-        .fd_stand = 0,
-        .fd_nplanes = 16,
-        .fd_r1 = 0,
-        .fd_r2 = 0,
-        .fd_r3 = 0
-    };
-    
-    short pxy[] = {0, 0, LX - 1, LY - 1, 0, 0, LX - 1, LY - 1};
-    vro_cpyfm(vdi_handle, S_ONLY, pxy, &src_mfdb, &dst_mfdb);
-    
-    // while (1);
 }
 
 /** en of file */
