@@ -36,7 +36,7 @@
 
 // the mesh we will draw. 
 #include "buddha.h"
-#include <map>
+#include <unordered_map>
 
 #include <gem.h>
 
@@ -51,12 +51,6 @@ tgx::Image<tgx::RGB565> im(im_buffer, LX, LY);      // ...and associated tgx::Im
 float zbuffer[LX * LY];                             // z-buffer (same sie as the image)
 
 tgx::Renderer3D<tgx::RGB565> renderer;              // the 3D renderer (loads all shaders).
-
-struct wh
-{
-    short w;
-    short h;
-};
 
 class Window;
 class GEMApplication;
@@ -84,16 +78,16 @@ public:
         theApplication = this;
     }
     
-    constexpr struct wh wh(void)
+    constexpr PXY wh(void)
     {
-        struct wh ret = {(short) (work_out[0] + 1), (short) (work_out[1] + 1)};
+        PXY ret = {(short) (work_out[0] + 1), (short) (work_out[1] + 1)};
         
         return ret;
     }
     
     
     constexpr short vh() { return vdi_handle; }
-    std::map<short, Window> windows;    
+    std::unordered_map<short, Window*> windows;    
 };
 
 class Window
@@ -124,24 +118,26 @@ public:
         wind_open(handle, x, y, w, h);
         
         open = true;
-        theApplication->windows.insert(std::pair<short, Window&>(handle, *this));
+        theApplication->windows.insert(std::pair<short, Window*>(handle, this));
                 
         std::cout << "Window::Window: window handle=" << handle << std::endl;
     }
     
-    ~Window()
+    virtual ~Window()
     {
         if (open)
         {
             std::cout << "window was open" << std::endl;
-            wind_close(handle);
+           // wind_close(handle);
             open = false;
         } else
             std::cout << "window was not open" << std::endl;
         
-        wind_delete(handle);
+        //wind_delete(handle);
         std::cout << "Window destructor" << std::endl << std::flush;
     }
+    
+    Window(const Window&) = delete;     // delete copy constructor
     
     virtual void full(void) {
         short x, y, w, h;
@@ -203,9 +199,9 @@ public:
         
         MFDB dst_mfdb = {
             .fd_addr = NULL,
-            .fd_w = theApplication->wh().w,
-            .fd_h = theApplication->wh().h,
-            .fd_wdwidth = (short) ((theApplication->wh().w + 15) / 16),
+            .fd_w = theApplication->wh().p_x,
+            .fd_h = theApplication->wh().p_y,
+            .fd_wdwidth = (short) ((theApplication->wh().p_x + 15) / 16),
             .fd_stand = 0,
             .fd_nplanes = 16,
             .fd_r1 = 0,
@@ -232,8 +228,8 @@ int main()
     renderer.setOffset(0, 0);           //  ...so no offset
     renderer.setImage(&im);             // set the image to draw onto
     renderer.setZbuffer(zbuffer);       // set the z buffer for depth testing
-    renderer.setPerspective(45, ((float)LX) / LY, 1.0f, 100.0f);  // set the perspective projection matrix.     
-    renderer.setMaterial(tgx::RGBf(0.85f, 0.55f, 0.25f), 0.2f, 0.7f, 0.8f, 64); // set material properties
+    renderer.setPerspective(45, ((float)LX) / LY, 1.0f, 100.0f);  // set the perspective projection matrix.
+    renderer.setMaterial(tgx::RGBf(/*0.85f */0.25f, 0.55f, /*0.25f*/ 0.85f), 0.2f, 0.7f, 0.8f, 64); // set material properties
     renderer.setShaders(tgx::SHADER_GOURAUD); // draw with Gouraud shaders
     
     // draw the mesh 
@@ -248,6 +244,7 @@ int main()
     wi.clear(0, 0, LX, LY);
     wi.draw(0, 0, 200, 200);
     
+    while (!evnt_keybd());
 }
 
 /** en of file */
