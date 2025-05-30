@@ -84,14 +84,49 @@ public:
         
         return ret;
     }
-    
-    
     constexpr short vh() { return vdi_handle; }
-    std::unordered_map<short, Window*> windows;    
+    
+    void handle_window_message(short* msgbuff);
+    
+    void event_loop(void)
+    {
+        short msgbuff[8];
+        short keycode;
+        short mx, my;
+        short ret;
+        bool quit;
+        short butdown;
+        short event;
+        short keystate;
+        short keyreturn;
+        short mbreturn;
+        long msec = 20;
+        
+        event = evnt_multi(MU_MESAG | MU_BUTTON | MU_KEYBD | MU_TIMER,
+                           0x103, 3, butdown,
+                           0, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0,
+                           msgbuff, msec, &mx, &my, &mbreturn, &keystate, &keyreturn, &ret);
+        wind_update(BEG_UPDATE);
+        
+        if (event & MU_MESAG)
+        {
+            handle_window_message(msgbuff);
+        }
+    }
+            
+    
+    std::unordered_map<short, Window*> windows;
+    
+    Window *window_from_handle(short handle)
+    {
+        return windows[handle];
+    }
 };
 
 class Window
 {
+protected:
     short handle;
     
     GRECT rect;
@@ -113,9 +148,16 @@ class Window
     
 public:
     Window(short kind, short x, short y, short w, short h) {
-        wind_calc(WC_BORDER, SIZER|MOVER, x, y, w, h, &x, &y, &w, &h);
+        wind_calc(WC_BORDER, kind, x, y, w, h, &x, &y, &w, &h);
         handle = wind_create(kind, x, y, w, h);
         wind_open(handle, x, y, w, h);
+        
+        rect = {x, y, w, h};
+        
+        std::cout << "rect = {" << x << ", " << y << ", " << w << ", " << h << "}" << std::endl;
+        wind_calc(WC_WORK, kind, x, y, w, h, &x, &y, &w, &h);
+        work = {x, y, w, h};
+        std::cout << "work = {" << x << ", " << y << ", " << w << ", " << h << "}" << std::endl;
         
         open = true;
         theApplication->windows.insert(std::pair<short, Window*>(handle, this));
@@ -128,17 +170,66 @@ public:
         if (open)
         {
             std::cout << "window was open" << std::endl;
-           // wind_close(handle);
+            wind_close(handle);
             open = false;
         } else
             std::cout << "window was not open" << std::endl;
         
-        //wind_delete(handle);
+        wind_delete(handle);
         std::cout << "Window destructor" << std::endl << std::flush;
     }
     
     Window(const Window&) = delete;     // delete copy constructor
     
+    void handle_message(short *msgbuff)
+    {
+        switch (msgbuff[0])
+        {
+            case WM_REDRAW:
+                draw(msgbuff[4], msgbuff[5], msgbuff[6], msgbuff[7]);
+                break;
+            
+            case WM_ONTOP:
+            case WM_NEWTOP:
+            case WM_TOPPED:
+                wind_set(handle, WF_TOP, 0, 0, 0, 0);
+                topped = true;
+                break;
+            
+            case WM_UNTOPPED:
+                topped = false;
+                break;
+        
+            case WM_SIZED:
+            case WM_MOVED:
+                size(msgbuff[4], msgbuff[5], msgbuff[6], msgbuff[7]);
+                break;
+        
+            case WM_FULLED:
+                full();
+                break;
+        
+            case WM_CLOSED:
+                //del();
+                break;
+        
+            case WM_ARROWED:
+                switch (msgbuff[4])
+                {
+                    case WA_UPPAGE:
+                        top -= work.g_h;
+                        break;
+                    case WA_DNPAGE:
+                        top += work.g_h;
+                        break;
+                }
+            
+            default:
+                std::cout << "unknown window message " << msgbuff[0] << std::endl;
+        }
+        wind_update(END_UPDATE);
+    }
+        
     virtual void full(void) {
         short x, y, w, h;
         wind_set(handle, WF_FULLXYWH, x, y, w, h);
@@ -210,9 +301,12 @@ public:
         };
         
         short pxy[] = {
-            0,  20,       LX - 1, LY - 1,
-            100,  20, 100 + LX - 1, LY - 1
-        };
+            (short) (x - work.g_x), (short)(y - work.g_y), work.g_w, work.g_h,
+            work.g_x, work.g_y, work.g_w, work.g_h};
+
+//            0,  20,       LX - 1, LY - 1,
+//            100,  20, 100 +   LX - 1, LY - 1
+//        };
         
         vro_cpyfm(theApplication->vh(), S_ONLY, pxy, &src_mfdb, &dst_mfdb);
         
@@ -221,6 +315,12 @@ public:
 };
 
 
+void GEMApplication::handle_window_message(short *msgbuff)
+{
+    auto wi = theApplication->window_from_handle(msgbuff[3]);
+    wi->handle_message(msgbuff);    
+}
+
 int main()
 {
     // setup the 3D renderer.
@@ -228,19 +328,19 @@ int main()
     renderer.setOffset(0, 0);           //  ...so no offset
     renderer.setImage(&im);             // set the image to draw onto
     renderer.setZbuffer(zbuffer);       // set the z buffer for depth testing
-    renderer.setPerspective(45, ((float)LX) / LY, 1.0f, 100.0f);  // set the perspective projection matrix.
+    renderer.setPerspective(45, ((float) LX) / LY, 1.0f, 100.0f);  // set the perspective projection matrix.
     renderer.setMaterial(tgx::RGBf(/*0.85f */0.25f, 0.55f, /*0.25f*/ 0.85f), 0.2f, 0.7f, 0.8f, 64); // set material properties
     renderer.setShaders(tgx::SHADER_GOURAUD); // draw with Gouraud shaders
     
     // draw the mesh 
     im.clear(tgx::RGB565_Gray);  // clear the image
     renderer.clearZbuffer(); // and the zbuffer.
-    renderer.setModelPosScaleRot({ 0, 0.5f, -36 }, { 13,13,13 }, 0); // set the position of the mesh
+    renderer.setModelPosScaleRot({ 0, 0.5f, -36 }, { 13,13,13 }, 45); // set the position of the mesh
     renderer.drawMesh(&buddha, false); // and then draw it !
     
     
     GEMApplication ap;
-    BuddhaWindow wi(SIZER|MOVER, 0, 0, 50, 50);
+    BuddhaWindow wi(NAME|SIZER|MOVER|CLOSER, 100,  40, 100 + LX - 1, 40 + LY - 1);
     wi.clear(0, 0, LX, LY);
     wi.draw(0, 0, 200, 200);
     
