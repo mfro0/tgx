@@ -86,7 +86,7 @@ public:
     }
     constexpr short vh() { return vdi_handle; }
     
-    void handle_window_message(short* msgbuff);
+    bool handle_window_message(short* msgbuff);
     
     void event_loop(void)
     {
@@ -94,7 +94,7 @@ public:
         short keycode;
         short mx, my;
         short ret;
-        bool quit;
+        bool quit = false;
         short butdown;
         short event;
         short keystate;
@@ -102,17 +102,22 @@ public:
         short mbreturn;
         long msec = 20;
         
-        event = evnt_multi(MU_MESAG | MU_BUTTON | MU_KEYBD | MU_TIMER,
-                           0x103, 3, butdown,
-                           0, 0, 0, 0, 0,
-                           0, 0, 0, 0, 0,
-                           msgbuff, msec, &mx, &my, &mbreturn, &keystate, &keyreturn, &ret);
-        wind_update(BEG_UPDATE);
-        
-        if (event & MU_MESAG)
+        do
         {
-            handle_window_message(msgbuff);
-        }
+            event = evnt_multi(MU_MESAG | MU_BUTTON | MU_KEYBD | MU_TIMER,
+                               0x103, 3, butdown,
+                               0, 0, 0, 0, 0,
+                               0, 0, 0, 0, 0,
+                               msgbuff, msec, &mx, &my, &mbreturn, &keystate, &keyreturn, &ret);
+            wind_update(BEG_UPDATE);
+        
+            if (event & MU_MESAG)
+            {
+                quit = handle_window_message(msgbuff);
+            }
+            wind_update(END_UPDATE);
+            
+        } while (!quit);
     }
             
     
@@ -135,6 +140,9 @@ protected:
     
     int left;
     int top;
+    
+    int x_fac;
+    int y_fac;
     
     int doc_width;
     int doc_height;
@@ -180,55 +188,6 @@ public:
     }
     
     Window(const Window&) = delete;     // delete copy constructor
-    
-    void handle_message(short *msgbuff)
-    {
-        switch (msgbuff[0])
-        {
-            case WM_REDRAW:
-                draw(msgbuff[4], msgbuff[5], msgbuff[6], msgbuff[7]);
-                break;
-            
-            case WM_ONTOP:
-            case WM_NEWTOP:
-            case WM_TOPPED:
-                wind_set(handle, WF_TOP, 0, 0, 0, 0);
-                topped = true;
-                break;
-            
-            case WM_UNTOPPED:
-                topped = false;
-                break;
-        
-            case WM_SIZED:
-            case WM_MOVED:
-                size(msgbuff[4], msgbuff[5], msgbuff[6], msgbuff[7]);
-                break;
-        
-            case WM_FULLED:
-                full();
-                break;
-        
-            case WM_CLOSED:
-                //del();
-                break;
-        
-            case WM_ARROWED:
-                switch (msgbuff[4])
-                {
-                    case WA_UPPAGE:
-                        top -= work.g_h;
-                        break;
-                    case WA_DNPAGE:
-                        top += work.g_h;
-                        break;
-                }
-            
-            default:
-                std::cout << "unknown window message " << msgbuff[0] << std::endl;
-        }
-        wind_update(END_UPDATE);
-    }
         
     virtual void full(void) {
         short x, y, w, h;
@@ -237,7 +196,22 @@ public:
     
     virtual void size(short x, short y, short w, short h)
     {
-        wind_set(handle, WF_WORKXYWH, x, y, w, h);
+        /*
+        if (w < MIN_WIDTH)
+        {
+            w = MIN_WIDTH;
+        }
+        if (h < MIN_HEIGHT)
+        {
+            h = MIN_HEIGHT;
+        }
+        */
+        
+        wind_set(handle, WF_CURRXYWH, x, y, w, h);
+        wind_get(handle, WF_WORKXYWH, &work.g_x, &work.g_y, &work.g_w, &work.g_h);
+        wind_get(handle, WF_CURRXYWH, &rect.g_x, &rect.g_y, &rect.g_w, &rect.g_h);
+        scroll(); /* fix slider sizes and positions */
+        
     }
     
     virtual void draw(short x, short y, short w, short h)
@@ -259,6 +233,127 @@ public:
     {
         
     };
+    
+    virtual void do_redraw(short xc, short yc, short wc, short hc)
+    {
+        GRECT t1, t2 = {xc, yc, wc, hc};
+        graf_mouse(M_OFF, 0);
+        
+        wind_update(BEG_UPDATE);
+        
+        wind_get(handle, WF_FIRSTXYWH, &t1.g_x, &t1.g_y, &t1.g_w, &t1.g_h);
+        
+        while (t1.g_w || t1.g_h)
+        {
+            if (rc_intersect(&t2, &t1))
+            {
+                // set_clipping(theApplication->vh(), t1.g_x, t1.g_y, t1.g_w, t1.g_h, 1);
+                draw(t1.g_x, t1.g_y, t1.g_w, t1.g_h);
+            }
+            wind_get(handle, WF_NEXTXYWH, &t1.g_x, &t1.g_y, &t1.g_w, &t1.g_h);
+        }
+        wind_update(END_UPDATE);
+        graf_mouse(M_ON, NULL);
+    }
+    
+    bool handle_message(short *msgbuff)
+    {
+        switch (msgbuff[0])
+        {
+            case WM_REDRAW:
+                draw(msgbuff[4], msgbuff[5], msgbuff[6], msgbuff[7]);
+                break;
+        
+            case WM_ONTOP:
+            case WM_NEWTOP:
+            case WM_TOPPED:
+                wind_set(handle, WF_TOP, 0, 0, 0, 0);
+                topped = true;
+                break;
+        
+            case WM_UNTOPPED:
+                topped = false;
+                break;
+            
+            case WM_SIZED:
+            case WM_MOVED:
+                size(msgbuff[4], msgbuff[5], msgbuff[6], msgbuff[7]);
+                break;
+            
+            case WM_FULLED:
+                full();
+                break;
+            
+            case WM_CLOSED:
+                return true;                
+                break;
+            
+            case WM_ARROWED:
+                switch (msgbuff[4])
+                {
+                    case WA_UPPAGE:
+                        top -= work.g_h;
+                        break;
+                    case WA_DNPAGE:
+                        top += work.g_h;
+                        break;
+                    case WA_UPLINE:
+                        top -= y_fac;
+                        break;
+                    case WA_DNLINE:
+                        top += y_fac;
+                        break;
+                    case WA_LFPAGE:
+                        left -= work.g_w;
+                        break;
+                    case WA_RTPAGE:
+                        left += work.g_w;
+                        break;
+                    case WA_LFLINE:
+                        left--;
+                        break;
+                    case WA_RTLINE:
+                        left++;
+                        break;
+                }
+                if (top > doc_height - work.g_h)
+                    top = doc_height - work.g_h;
+                if (top < 0) top = 0;
+                if (left > doc_width - work.g_w)
+                    left = doc_width - work.g_w;
+                if (left < 0) left = 0;
+                
+                scroll();
+                
+                do_redraw(work.g_x, work.g_y, work.g_w, work.g_h);
+                break;
+            
+            case WM_HSLID:
+                left = msgbuff[4] * doc_width / 1000;
+                
+                if (left > doc_width - work.g_w)
+                    left = doc_width - work.g_w;
+                scroll();
+                
+                do_redraw(work.g_x, work.g_y, work.g_w, work.g_h);
+                break;
+            
+            case WM_VSLID:
+                top = msgbuff[4] * doc_height / 1000;
+                
+                if (top > doc_height - work.g_h)
+                    top = doc_height - work.g_h;
+                scroll();
+                
+                do_redraw(work.g_x, work.g_y, work.g_w, work.g_h);
+                break;
+        
+            default:
+                std::cout << "unknown window message " << msgbuff[0] << std::endl;
+        }
+        wind_update(END_UPDATE);
+        return false;
+    }
 };
 
 class BuddhaWindow : public Window
@@ -301,8 +396,12 @@ public:
         };
         
         short pxy[] = {
-            (short) (x - work.g_x), (short)(y - work.g_y), work.g_w, work.g_h,
-            work.g_x, work.g_y, work.g_w, work.g_h};
+            0, 0,
+            work.g_w - 1,
+            work.g_h - 1,
+            work.g_x, work.g_y,
+            work.g_x + work.g_w - 1,
+            work.g_y + work.g_h - 1 };
 
 //            0,  20,       LX - 1, LY - 1,
 //            100,  20, 100 +   LX - 1, LY - 1
@@ -315,10 +414,10 @@ public:
 };
 
 
-void GEMApplication::handle_window_message(short *msgbuff)
+bool GEMApplication::handle_window_message(short *msgbuff)
 {
     auto wi = theApplication->window_from_handle(msgbuff[3]);
-    wi->handle_message(msgbuff);    
+    return wi->handle_message(msgbuff);    
 }
 
 int main()
@@ -340,11 +439,10 @@ int main()
     
     
     GEMApplication ap;
-    BuddhaWindow wi(NAME|SIZER|MOVER|CLOSER, 100,  40, 100 + LX - 1, 40 + LY - 1);
-    wi.clear(0, 0, LX, LY);
-    wi.draw(0, 0, 200, 200);
+    BuddhaWindow wi(NAME | SIZER | MOVER | CLOSER | HSLIDE | VSLIDE,
+                    100,  40, 100 + LX - 1, 40 + LY - 1);
     
-    while (!evnt_keybd());
+    theApplication->event_loop();
 }
 
 /** en of file */
