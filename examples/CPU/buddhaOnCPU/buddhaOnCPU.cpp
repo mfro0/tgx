@@ -119,7 +119,18 @@ public:
             
         } while (!quit);
     }
-            
+    
+    void set_clipping(short handle, short x, short y, short w, short h, short on)
+    {
+        short clip[4];
+        
+        clip[0] = x;
+        clip[1] = y;
+        clip[2] = clip[0] + w - 1;
+        clip[3] = clip[1] + h - 1;
+        
+        vs_clip(handle, on, clip);
+    }
     
     std::unordered_map<short, Window*> windows;
     
@@ -161,30 +172,23 @@ public:
         wind_open(handle, x, y, w, h);
         
         rect = {x, y, w, h};
-        
-        std::cout << "rect = {" << x << ", " << y << ", " << w << ", " << h << "}" << std::endl;
         wind_calc(WC_WORK, kind, x, y, w, h, &x, &y, &w, &h);
         work = {x, y, w, h};
-        std::cout << "work = {" << x << ", " << y << ", " << w << ", " << h << "}" << std::endl;
         
         open = true;
         theApplication->windows.insert(std::pair<short, Window*>(handle, this));
                 
-        std::cout << "Window::Window: window handle=" << handle << std::endl;
     }
     
     virtual ~Window()
     {
         if (open)
         {
-            std::cout << "window was open" << std::endl;
             wind_close(handle);
             open = false;
         } else
-            std::cout << "window was not open" << std::endl;
         
         wind_delete(handle);
-        std::cout << "Window destructor" << std::endl << std::flush;
     }
     
     Window(const Window&) = delete;     // delete copy constructor
@@ -196,7 +200,9 @@ public:
     
     virtual void size(short x, short y, short w, short h)
     {
-        /*
+        const short MIN_WIDTH = 100;
+        const short MIN_HEIGHT = 100;
+
         if (w < MIN_WIDTH)
         {
             w = MIN_WIDTH;
@@ -205,18 +211,15 @@ public:
         {
             h = MIN_HEIGHT;
         }
-        */
         
         wind_set(handle, WF_CURRXYWH, x, y, w, h);
         wind_get(handle, WF_WORKXYWH, &work.g_x, &work.g_y, &work.g_w, &work.g_h);
         wind_get(handle, WF_CURRXYWH, &rect.g_x, &rect.g_y, &rect.g_w, &rect.g_h);
         scroll(); /* fix slider sizes and positions */
-        
     }
     
     virtual void draw(short x, short y, short w, short h)
     {
-        std::cout << "Window::draw()" << std::endl << std::flush;
     };
     
     virtual void clear(short x, short y, short w, short h)
@@ -226,7 +229,41 @@ public:
     
     virtual void scroll()
     {
+        short sl_vpos;
+        short sl_hpos;
+        short sl_hsz;
+        short sl_vsz;
+        long dw, dh;
         
+        /*
+     * set sliders according to document area
+     * If document size is smaller than window area, use the latter
+     */
+        dw = (doc_width > 0 ? doc_width : rect.g_w);
+        dh = (doc_height > 0 ? doc_height : rect.g_h);
+        
+        sl_hsz = dw == 0 ? 1000 : 1000L * work.g_w / dw;
+        sl_hsz = sl_hsz > 1000 ? 1000 : sl_hsz;
+        sl_vsz = dh == 0 ? 1000 : 1000L * work.g_h / dh;
+        sl_vsz = sl_vsz > 1000 ? 1000 : sl_vsz;
+        
+        if (dw - work.g_w == 0)
+            sl_vpos = 0;
+        else
+            sl_vpos = 1000L * left / (dw - work.g_w);
+        sl_vpos = sl_vpos > 1000 ? 1000 : sl_vpos;
+        sl_vpos = sl_vpos < 0 ? 0 : sl_vpos;
+        
+        if (dh - work.g_h == 0)
+            sl_hpos = 0;
+        else
+            sl_hpos = 1000L * top / (dh - work.g_h);
+        sl_hpos = sl_hpos > 1000 ? 1000 : sl_hpos;
+        sl_hpos = sl_hpos < 0 ? 0 : sl_hpos;
+        wind_set(handle, WF_HSLIDE, sl_vpos, 0, 0, 0);
+        wind_set(handle, WF_VSLIDE, sl_hpos, 0, 0, 0);
+        wind_set(handle, WF_HSLSIZE, sl_hsz, 0, 0, 0);
+        wind_set(handle, WF_VSLSIZE, sl_vsz, 0, 0, 0);        
     }
     
     virtual void timer()
@@ -247,7 +284,7 @@ public:
         {
             if (rc_intersect(&t2, &t1))
             {
-                // set_clipping(theApplication->vh(), t1.g_x, t1.g_y, t1.g_w, t1.g_h, 1);
+                theApplication->set_clipping(theApplication->vh(), t1.g_x, t1.g_y, t1.g_w, t1.g_h, 1);
                 draw(t1.g_x, t1.g_y, t1.g_w, t1.g_h);
             }
             wind_get(handle, WF_NEXTXYWH, &t1.g_x, &t1.g_y, &t1.g_w, &t1.g_h);
@@ -349,7 +386,8 @@ public:
                 break;
         
             default:
-                std::cout << "unknown window message " << msgbuff[0] << std::endl;
+                std::cout.setf(std::ios::hex);
+                std::cout << "unknown window message " <<  msgbuff[0] << std::endl;
         }
         wind_update(END_UPDATE);
         return false;
@@ -361,14 +399,14 @@ class BuddhaWindow : public Window
 public:
     BuddhaWindow(short what, short x, short y, short w, short h) : Window(what, x, y, w, h)
     {
-        std::cout << "BuddhaWindow constructor" << std::endl << std::flush;
+        doc_width = LX;
+        doc_height = LY;
     }
     
     ~BuddhaWindow(){
-        std::cout << "BuddhaWindow destructor" << std::endl << std::flush;
     }
     
-    virtual void draw(short x, short y, short w, short h)
+    virtual void draw(short wx, short wy, short ww, short wh)
     {
         MFDB src_mfdb = {
             .fd_addr= im_buffer,
@@ -384,32 +422,23 @@ public:
         
         
         MFDB dst_mfdb = {
-            .fd_addr = NULL,
-            .fd_w = theApplication->wh().p_x,
-            .fd_h = theApplication->wh().p_y,
-            .fd_wdwidth = (short) ((theApplication->wh().p_x + 15) / 16),
-            .fd_stand = 0,
-            .fd_nplanes = 16,
-            .fd_r1 = 0,
-            .fd_r2 = 0,
-            .fd_r3 = 0
+            .fd_addr = NULL     // nothing else required if target is screen
         };
         
+        short x, y, w, h;
+        wind_get(handle, WF_WORKXYWH, &x, &y, &w, &h);
+        
         short pxy[] = {
-            0, 0,
-            work.g_w - 1,
-            work.g_h - 1,
+            left, top,
+            left + work.g_w - 1,
+            top + work.g_h - 1,
             work.g_x, work.g_y,
             work.g_x + work.g_w - 1,
-            work.g_y + work.g_h - 1 };
-
-//            0,  20,       LX - 1, LY - 1,
-//            100,  20, 100 +   LX - 1, LY - 1
-//        };
+            work.g_y + work.g_h - 1
+        };
         
+        theApplication->set_clipping(theApplication->vh(), wx, wy , ww, wh, 1);
         vro_cpyfm(theApplication->vh(), S_ONLY, pxy, &src_mfdb, &dst_mfdb);
-        
-        std::cout << "BuddhaWindow::draw()" << std::endl << std::flush;
     }
 };
 
@@ -439,8 +468,10 @@ int main()
     
     
     GEMApplication ap;
-    BuddhaWindow wi(NAME | SIZER | MOVER | CLOSER | HSLIDE | VSLIDE,
-                    100,  40, 100 + LX - 1, 40 + LY - 1);
+    BuddhaWindow wi(NAME | SIZER | MOVER | CLOSER | FULLER |
+                    HSLIDE | VSLIDE |
+                    UPARROW | DNARROW | LFARROW | RTARROW,
+                    100,  40, 100 + 200 - 1, 40 + 200 - 1);
     
     theApplication->event_loop();
 }
