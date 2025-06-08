@@ -35,7 +35,7 @@
 #include "tgx.h" 
 
 // the mesh we will draw. 
-#include "buddha.h"
+#include "teapot.h"
 #include <unordered_map>
 
 #include <gem.h>
@@ -195,7 +195,9 @@ public:
         
     virtual void full(void) {
         short x, y, w, h;
-        wind_set(handle, WF_FULLXYWH, x, y, w, h);
+        wind_get(handle, WF_FULLXYWH, &x, &y, &w, &h);
+        wind_set(handle, WF_CURRXYWH, x, y, w, h);
+        wind_get_grect(handle, WF_CURRXYWH, &rect);
     };
     
     virtual void size(short x, short y, short w, short h)
@@ -429,12 +431,13 @@ public:
         wind_get(handle, WF_WORKXYWH, &x, &y, &w, &h);
         
         short pxy[] = {
-            left, top,
-            left + work.g_w - 1,
-            top + work.g_h - 1,
+            static_cast<short>(left),
+            static_cast<short>(top),
+            static_cast<short>(left + work.g_w - 1),
+            static_cast<short>(top + work.g_h - 1),
             work.g_x, work.g_y,
-            work.g_x + work.g_w - 1,
-            work.g_y + work.g_h - 1
+            static_cast<short>(work.g_x + work.g_w - 1),
+            static_cast<short>(work.g_y + work.g_h - 1)
         };
         
         theApplication->set_clipping(theApplication->vh(), wx, wy , ww, wh, 1);
@@ -457,21 +460,22 @@ int main()
     renderer.setImage(&im);             // set the image to draw onto
     renderer.setZbuffer(zbuffer);       // set the z buffer for depth testing
     renderer.setPerspective(45, ((float) LX) / LY, 1.0f, 100.0f);  // set the perspective projection matrix.
-    renderer.setMaterial(tgx::RGBf(/*0.85f */0.25f, 0.55f, /*0.25f*/ 0.85f), 0.2f, 0.7f, 0.8f, 64); // set material properties
+    renderer.setMaterial(tgx::RGBf(0.85f, 0.55f, 0.25f), 0.2f, 0.7f, 0.8f, 64); // set material properties
     renderer.setShaders(tgx::SHADER_GOURAUD); // draw with Gouraud shaders
     
     // draw the mesh 
     im.clear(tgx::RGB565_Gray);  // clear the image
     renderer.clearZbuffer(); // and the zbuffer.
-    renderer.setModelPosScaleRot({ 0, 0.5f, -36 }, { 13,13,13 }, 45); // set the position of the mesh
-    renderer.drawMesh(&buddha, false); // and then draw it !
-    
+    renderer.setModelPosScaleRot({ 0, 0.5f, -36 }, { 13,13,13 }, -45); // set the position of the mesh
+    renderer.drawMesh(&teapot_1, false); // and then draw it !
+    renderer.drawMesh(&teapot_2, false);
     
     GEMApplication ap;
     BuddhaWindow wi(NAME | SIZER | MOVER | CLOSER | FULLER |
                     HSLIDE | VSLIDE |
                     UPARROW | DNARROW | LFARROW | RTARROW,
                     100,  40, 100 + 200 - 1, 40 + 200 - 1);
+    wi.size(100, 40, 100 + 200 - 1, 40 + 200 - 1);
     
     theApplication->event_loop();
 }
