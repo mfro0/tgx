@@ -34,6 +34,13 @@ cmake_minimum_required(VERSION 3.10)
 
 project(buddhaOnCPU)
 
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mcpu=68040")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mcpu=68040")
+set(CMAKE_LD_FLAGS "${CMAKE_LD_FLAGS} -mcpu=68040")
+#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mcpu=547x")
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mcpu=547x")
+#set(CMAKE_LD_FLAGS "${CMAKE_LD_FLAGS} -mcpu=547x")
+
 # release is the default build type
 if (NOT CMAKE_BUILD_TYPE)
 	set(CMAKE_BUILD_TYPE Release)

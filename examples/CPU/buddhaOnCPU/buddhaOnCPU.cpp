@@ -35,7 +35,9 @@
 #include "tgx.h" 
 
 // the mesh we will draw. 
-#include "teapot.h"
+// #include "teapot.h"
+#include "buddha.h"
+
 #include <unordered_map>
 
 #include <gem.h>
@@ -88,37 +90,7 @@ public:
     
     bool handle_window_message(short* msgbuff);
     
-    void event_loop(void)
-    {
-        short msgbuff[8];
-        short keycode;
-        short mx, my;
-        short ret;
-        bool quit = false;
-        short butdown;
-        short event;
-        short keystate;
-        short keyreturn;
-        short mbreturn;
-        long msec = 20;
-        
-        do
-        {
-            event = evnt_multi(MU_MESAG | MU_BUTTON | MU_KEYBD | MU_TIMER,
-                               0x103, 3, butdown,
-                               0, 0, 0, 0, 0,
-                               0, 0, 0, 0, 0,
-                               msgbuff, msec, &mx, &my, &mbreturn, &keystate, &keyreturn, &ret);
-            wind_update(BEG_UPDATE);
-        
-            if (event & MU_MESAG)
-            {
-                quit = handle_window_message(msgbuff);
-            }
-            wind_update(END_UPDATE);
-            
-        } while (!quit);
-    }
+    void event_loop(void);
     
     void set_clipping(short handle, short x, short y, short w, short h, short on)
     {
@@ -270,7 +242,7 @@ public:
     
     virtual void timer()
     {
-        
+        std::cout << "Window::timer()" << std::endl;
     };
     
     virtual void do_redraw(short xc, short yc, short wc, short hc)
@@ -278,8 +250,19 @@ public:
         GRECT t1, t2 = {xc, yc, wc, hc};
         graf_mouse(M_OFF, 0);
         
+        static float angle = -45.0f;
+        
         wind_update(BEG_UPDATE);
         
+        
+        // draw the mesh 
+        im.clear(tgx::RGB565_Gray);  // clear the image
+        renderer.clearZbuffer(); // and the zbuffer.
+        angle += 5.0f;
+        renderer.setModelPosScaleRot({ 0, 0.5f, -36 }, { 13,13,13 }, angle); // set the position of the mesh
+        renderer.drawMesh(&buddha, false); // and then draw it !
+        //renderer.drawMesh(&teapot_1, false);
+        //renderer.drawMesh(&teapot_2, false);
         wind_get(handle, WF_FIRSTXYWH, &t1.g_x, &t1.g_y, &t1.g_w, &t1.g_h);
         
         while (t1.g_w || t1.g_h)
@@ -396,6 +379,42 @@ public:
     }
 };
 
+void GEMApplication::event_loop(void) {
+    short msgbuff[8];
+    short keycode;
+    short mx, my;
+    short ret;
+    bool quit = false;
+    short butdown;
+    short event;
+    short keystate;
+    short keyreturn;
+    short mbreturn;
+    long msec = 20;
+    
+    do
+    {
+        event = evnt_multi(MU_MESAG | MU_BUTTON | MU_KEYBD | MU_TIMER,
+                           0x103, 3, butdown,
+                           0, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0,
+                           msgbuff, msec, &mx, &my, &mbreturn, &keystate, &keyreturn, &ret);
+        wind_update(BEG_UPDATE);
+        
+        if (event & MU_MESAG)
+        {
+            quit = handle_window_message(msgbuff);
+        }
+        if (event & MU_TIMER)
+        {
+            for (std::unordered_map<short, Window*>::iterator it = windows.begin(); it != windows.end(); it++)
+                it->second->timer();
+        }
+        wind_update(END_UPDATE);
+        
+    } while (!quit);
+}
+
 class BuddhaWindow : public Window
 {
 public:
@@ -443,6 +462,11 @@ public:
         theApplication->set_clipping(theApplication->vh(), wx, wy , ww, wh, 1);
         vro_cpyfm(theApplication->vh(), S_ONLY, pxy, &src_mfdb, &dst_mfdb);
     }
+    
+    virtual void timer(void)
+    {
+        do_redraw(work.g_x, work.g_y, work.g_w, work.g_h);
+    }
 };
 
 
@@ -467,8 +491,9 @@ int main()
     im.clear(tgx::RGB565_Gray);  // clear the image
     renderer.clearZbuffer(); // and the zbuffer.
     renderer.setModelPosScaleRot({ 0, 0.5f, -36 }, { 13,13,13 }, -45); // set the position of the mesh
-    renderer.drawMesh(&teapot_1, false); // and then draw it !
-    renderer.drawMesh(&teapot_2, false);
+    renderer.drawMesh(&buddha, false);
+    //renderer.drawMesh(&teapot_1, false); // and then draw it !
+    //renderer.drawMesh(&teapot_2, false);
     
     GEMApplication ap;
     BuddhaWindow wi(NAME | SIZER | MOVER | CLOSER | FULLER |
