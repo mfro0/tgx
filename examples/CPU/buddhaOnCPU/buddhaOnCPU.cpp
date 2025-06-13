@@ -116,7 +116,7 @@ class Window
 {
 protected:
     short handle;
-    
+    short kind;
     GRECT rect;
     GRECT work;
     GRECT old;
@@ -139,6 +139,7 @@ protected:
     
 public:
     Window(short kind, short x, short y, short w, short h) {
+        this->kind = kind;
         wind_calc(WC_BORDER, kind, x, y, w, h, &x, &y, &w, &h);
         handle = wind_create(kind, x, y, w, h);
         wind_open(handle, x, y, w, h);
@@ -181,14 +182,23 @@ public:
         {
             w = MIN_WIDTH;
         }
+        
         if (h < MIN_HEIGHT)
         {
             h = MIN_HEIGHT;
         }
         
+        // move this into BuddhaWindow::size()
+        // don't let the window size become larger than our drawing canvas
+        GRECT r = GRECT{x, y, w, h};
+        wind_calc_grect(WC_WORK, kind, &r, &work);
+        if (work.g_w > LX) work.g_w = LX;
+        if (work.g_h > LY) work.g_h = LY;
+        wind_calc(WC_BORDER, kind, work.g_x, work.g_y, work.g_w, work.g_h, &x, &y, &w, &h);
+        
         wind_set(handle, WF_CURRXYWH, x, y, w, h);
-        wind_get(handle, WF_WORKXYWH, &work.g_x, &work.g_y, &work.g_w, &work.g_h);
-        wind_get(handle, WF_CURRXYWH, &rect.g_x, &rect.g_y, &rect.g_w, &rect.g_h);
+        wind_get_grect(handle, WF_WORKXYWH, &work);
+        wind_get_grect(handle, WF_CURRXYWH, &rect);
         scroll(); /* fix slider sizes and positions */
     }
     
