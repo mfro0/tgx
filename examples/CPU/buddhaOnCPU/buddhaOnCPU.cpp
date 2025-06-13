@@ -422,6 +422,7 @@ public:
     {
         doc_width = LX;
         doc_height = LY;
+        left = top = 0;
     }
     
     ~BuddhaWindow(){
