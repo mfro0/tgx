@@ -54,376 +54,8 @@ float zbuffer[LX * LY];                             // z-buffer (same sie as the
 
 tgx::Renderer3D<tgx::RGB565> renderer;              // the 3D renderer (loads all shaders).
 
-class Window;
-class GEMApplication;
-
-GEMApplication *theApplication;
-
-class GEMApplication
-{
-    short ap_id;
-    short work_in[11];
-    short work_out[57];
-    short vdi_handle;
-public:
-    GEMApplication()
-    {
-        ap_id = appl_init();
-        
-        
-        for (auto i = 1; i < 10; i++)
-            work_in[i] = 0;
-        work_in[0] = 1;
-        work_in[10] = 2;
-        
-        v_opnvwk(work_in, &vdi_handle, work_out);
-        theApplication = this;
-    }
-    
-    constexpr PXY wh(void)
-    {
-        PXY ret = {(short) (work_out[0] + 1), (short) (work_out[1] + 1)};
-        
-        return ret;
-    }
-    constexpr short vh() { return vdi_handle; }
-    
-    bool handle_window_message(short* msgbuff);
-    
-    void event_loop(void);
-    
-    void set_clipping(short handle, short x, short y, short w, short h, short on)
-    {
-        short clip[4];
-        
-        clip[0] = x;
-        clip[1] = y;
-        clip[2] = clip[0] + w - 1;
-        clip[3] = clip[1] + h - 1;
-        
-        vs_clip(handle, on, clip);
-    }
-    
-    std::unordered_map<short, Window*> windows;
-    
-    Window *window_from_handle(short handle)
-    {
-        return windows[handle];
-    }
-};
-
-class Window
-{
-protected:
-    short handle;
-    short kind;
-    GRECT rect;
-    GRECT work;
-    GRECT old;
-    
-    int left;
-    int top;
-    
-    int x_fac;
-    int y_fac;
-    
-    int doc_width;
-    int doc_height;
-    
-    bool open;
-    bool topped;
-    bool fulled;
-    
-    char name[200];
-    char info[200];
-    
-public:
-    Window(short kind, short x, short y, short w, short h) {
-        this->kind = kind;
-        wind_calc(WC_BORDER, kind, x, y, w, h, &x, &y, &w, &h);
-        handle = wind_create(kind, x, y, w, h);
-        wind_open(handle, x, y, w, h);
-        
-        rect = {x, y, w, h};
-        wind_calc(WC_WORK, kind, x, y, w, h, &x, &y, &w, &h);
-        work = {x, y, w, h};
-        
-        open = true;
-        theApplication->windows.insert(std::pair<short, Window*>(handle, this));
-                
-    }
-    
-    virtual ~Window()
-    {
-        if (open)
-        {
-            wind_close(handle);
-            open = false;
-        } else
-        
-        wind_delete(handle);
-    }
-    
-    Window(const Window&) = delete;     // delete copy constructor
-        
-    virtual void full(void) {
-        short x, y, w, h;
-        wind_get(handle, WF_FULLXYWH, &x, &y, &w, &h);
-        wind_set(handle, WF_CURRXYWH, x, y, w, h);
-        wind_get_grect(handle, WF_CURRXYWH, &rect);
-    };
-    
-    virtual void size(short x, short y, short w, short h)
-    {
-        const short MIN_WIDTH = 100;
-        const short MIN_HEIGHT = 100;
-
-        if (w < MIN_WIDTH)
-        {
-            w = MIN_WIDTH;
-        }
-        
-        if (h < MIN_HEIGHT)
-        {
-            h = MIN_HEIGHT;
-        }
-        
-        // move this into BuddhaWindow::size()
-        // don't let the window size become larger than our drawing canvas
-        GRECT r = GRECT{x, y, w, h};
-        wind_calc_grect(WC_WORK, kind, &r, &work);
-        if (work.g_w > LX) work.g_w = LX;
-        if (work.g_h > LY) work.g_h = LY;
-        wind_calc(WC_BORDER, kind, work.g_x, work.g_y, work.g_w, work.g_h, &x, &y, &w, &h);
-        
-        wind_set(handle, WF_CURRXYWH, x, y, w, h);
-        wind_get_grect(handle, WF_WORKXYWH, &work);
-        wind_get_grect(handle, WF_CURRXYWH, &rect);
-        scroll(); /* fix slider sizes and positions */
-    }
-    
-    virtual void draw(short x, short y, short w, short h)
-    {
-    };
-    
-    virtual void clear(short x, short y, short w, short h)
-    {
-        
-    }
-    
-    virtual void scroll()
-    {
-        short sl_vpos;
-        short sl_hpos;
-        short sl_hsz;
-        short sl_vsz;
-        long dw, dh;
-        
-        /*
-     * set sliders according to document area
-     * If document size is smaller than window area, use the latter
-     */
-        dw = (doc_width > 0 ? doc_width : rect.g_w);
-        dh = (doc_height > 0 ? doc_height : rect.g_h);
-        
-        sl_hsz = dw == 0 ? 1000 : 1000L * work.g_w / dw;
-        sl_hsz = sl_hsz > 1000 ? 1000 : sl_hsz;
-        sl_vsz = dh == 0 ? 1000 : 1000L * work.g_h / dh;
-        sl_vsz = sl_vsz > 1000 ? 1000 : sl_vsz;
-        
-        if (dw - work.g_w == 0)
-            sl_vpos = 0;
-        else
-            sl_vpos = 1000L * left / (dw - work.g_w);
-        sl_vpos = sl_vpos > 1000 ? 1000 : sl_vpos;
-        sl_vpos = sl_vpos < 0 ? 0 : sl_vpos;
-        
-        if (dh - work.g_h == 0)
-            sl_hpos = 0;
-        else
-            sl_hpos = 1000L * top / (dh - work.g_h);
-        sl_hpos = sl_hpos > 1000 ? 1000 : sl_hpos;
-        sl_hpos = sl_hpos < 0 ? 0 : sl_hpos;
-        wind_set(handle, WF_HSLIDE, sl_vpos, 0, 0, 0);
-        wind_set(handle, WF_VSLIDE, sl_hpos, 0, 0, 0);
-        wind_set(handle, WF_HSLSIZE, sl_hsz, 0, 0, 0);
-        wind_set(handle, WF_VSLSIZE, sl_vsz, 0, 0, 0);        
-    }
-    
-    virtual void timer()
-    {
-        std::cout << "Window::timer()" << std::endl;
-    };
-    
-    virtual void do_redraw(short xc, short yc, short wc, short hc)
-    {
-        GRECT t1, t2 = {xc, yc, wc, hc};
-        graf_mouse(M_OFF, 0);
-        
-        static float angle = -45.0f;
-        
-        wind_update(BEG_UPDATE);
-        
-        
-        // draw the mesh 
-        im.clear(tgx::RGB565_Gray);  // clear the image
-        renderer.clearZbuffer(); // and the zbuffer.
-        angle += 5.0f;
-        renderer.setModelPosScaleRot({ 0, 0.5f, -36 }, { 13,13,13 }, angle); // set the position of the mesh
-        renderer.drawMesh(&buddha, false); // and then draw it !
-        //renderer.drawMesh(&teapot_1, false);
-        //renderer.drawMesh(&teapot_2, false);
-        wind_get(handle, WF_FIRSTXYWH, &t1.g_x, &t1.g_y, &t1.g_w, &t1.g_h);
-        
-        while (t1.g_w || t1.g_h)
-        {
-            if (rc_intersect(&t2, &t1))
-            {
-                theApplication->set_clipping(theApplication->vh(), t1.g_x, t1.g_y, t1.g_w, t1.g_h, 1);
-                draw(t1.g_x, t1.g_y, t1.g_w, t1.g_h);
-            }
-            wind_get(handle, WF_NEXTXYWH, &t1.g_x, &t1.g_y, &t1.g_w, &t1.g_h);
-        }
-        wind_update(END_UPDATE);
-        graf_mouse(M_ON, NULL);
-    }
-    
-    bool handle_message(short *msgbuff)
-    {
-        switch (msgbuff[0])
-        {
-            case WM_REDRAW:
-                draw(msgbuff[4], msgbuff[5], msgbuff[6], msgbuff[7]);
-                break;
-        
-            case WM_ONTOP:
-            case WM_NEWTOP:
-            case WM_TOPPED:
-                wind_set(handle, WF_TOP, 0, 0, 0, 0);
-                topped = true;
-                break;
-        
-            case WM_UNTOPPED:
-                topped = false;
-                break;
-            
-            case WM_SIZED:
-            case WM_MOVED:
-                size(msgbuff[4], msgbuff[5], msgbuff[6], msgbuff[7]);
-                break;
-            
-            case WM_FULLED:
-                full();
-                break;
-            
-            case WM_CLOSED:
-                return true;                
-                break;
-            
-            case WM_ARROWED:
-                switch (msgbuff[4])
-                {
-                    case WA_UPPAGE:
-                        top -= work.g_h;
-                        break;
-                    case WA_DNPAGE:
-                        top += work.g_h;
-                        break;
-                    case WA_UPLINE:
-                        top -= y_fac;
-                        break;
-                    case WA_DNLINE:
-                        top += y_fac;
-                        break;
-                    case WA_LFPAGE:
-                        left -= work.g_w;
-                        break;
-                    case WA_RTPAGE:
-                        left += work.g_w;
-                        break;
-                    case WA_LFLINE:
-                        left--;
-                        break;
-                    case WA_RTLINE:
-                        left++;
-                        break;
-                }
-                if (top > doc_height - work.g_h)
-                    top = doc_height - work.g_h;
-                if (top < 0) top = 0;
-                if (left > doc_width - work.g_w)
-                    left = doc_width - work.g_w;
-                if (left < 0) left = 0;
-                
-                scroll();
-                
-                do_redraw(work.g_x, work.g_y, work.g_w, work.g_h);
-                break;
-            
-            case WM_HSLID:
-                left = msgbuff[4] * doc_width / 1000;
-                
-                if (left > doc_width - work.g_w)
-                    left = doc_width - work.g_w;
-                scroll();
-                
-                do_redraw(work.g_x, work.g_y, work.g_w, work.g_h);
-                break;
-            
-            case WM_VSLID:
-                top = msgbuff[4] * doc_height / 1000;
-                
-                if (top > doc_height - work.g_h)
-                    top = doc_height - work.g_h;
-                scroll();
-                
-                do_redraw(work.g_x, work.g_y, work.g_w, work.g_h);
-                break;
-        
-            default:
-                std::cout.setf(std::ios::hex);
-                std::cout << "unknown window message " <<  msgbuff[0] << std::endl;
-        }
-        wind_update(END_UPDATE);
-        return false;
-    }
-};
-
-void GEMApplication::event_loop(void) {
-    short msgbuff[8];
-    short keycode;
-    short mx, my;
-    short ret;
-    bool quit = false;
-    short butdown;
-    short event;
-    short keystate;
-    short keyreturn;
-    short mbreturn;
-    long msec = 20;
-    
-    do
-    {
-        event = evnt_multi(MU_MESAG | MU_BUTTON | MU_KEYBD | MU_TIMER,
-                           0x103, 3, butdown,
-                           0, 0, 0, 0, 0,
-                           0, 0, 0, 0, 0,
-                           msgbuff, msec, &mx, &my, &mbreturn, &keystate, &keyreturn, &ret);
-        wind_update(BEG_UPDATE);
-        
-        if (event & MU_MESAG)
-        {
-            quit = handle_window_message(msgbuff);
-        }
-        if (event & MU_TIMER)
-        {
-            for (std::unordered_map<short, Window*>::iterator it = windows.begin(); it != windows.end(); it++)
-                it->second->timer();
-        }
-        wind_update(END_UPDATE);
-        
-    } while (!quit);
-}
+#include "Window.h"
+#include "GEMApplication.h"
 
 class BuddhaWindow : public Window
 {
@@ -478,7 +110,56 @@ public:
     {
         do_redraw(work.g_x, work.g_y, work.g_w, work.g_h);
     }
+    
+    virtual void size(short x, short y, short w, short h) {
+        // move this into BuddhaWindow::size()
+        // don't let the window size become larger than our drawing canvas
+        GRECT r = GRECT{x, y, w, h};
+        wind_calc_grect(WC_WORK, kind, &r, &work);
+        if (work.g_w > LX) work.g_w = LX;
+        if (work.g_h > LY) work.g_h = LY;
+        wind_calc(WC_BORDER, kind, work.g_x, work.g_y, work.g_w, work.g_h, &x, &y, &w, &h);
+        
+        wind_set(handle, WF_CURRXYWH, x, y, w, h);
+        wind_get_grect(handle, WF_WORKXYWH, &work);
+        wind_get_grect(handle, WF_CURRXYWH, &rect);
+        scroll(); /* fix slider sizes and positions */
+    }
+    
+    void do_redraw(short xc, short yc, short wc, short hc)
+    {
+        GRECT t1, t2 = {xc, yc, wc, hc};
+        graf_mouse(M_OFF, 0);
+        
+        static float angle = -45.0f;
+        
+        wind_update(BEG_UPDATE);
+        
+        
+        // draw the mesh 
+        im.clear(tgx::RGB565_Gray);  // clear the image
+        renderer.clearZbuffer(); // and the zbuffer.
+        angle += 5.0f;
+        renderer.setModelPosScaleRot({ 0, 0.5f, -36 }, { 13,13,13 }, angle); // set the position of the mesh
+        renderer.drawMesh(&buddha, false); // and then draw it !
+        //renderer.drawMesh(&teapot_1, false);
+        //renderer.drawMesh(&teapot_2, false);
+        wind_get(handle, WF_FIRSTXYWH, &t1.g_x, &t1.g_y, &t1.g_w, &t1.g_h);
+        
+        while (t1.g_w || t1.g_h)
+        {
+            if (rc_intersect(&t2, &t1))
+            {
+                theApplication->set_clipping(theApplication->vh(), t1.g_x, t1.g_y, t1.g_w, t1.g_h, 1);
+                draw(t1.g_x, t1.g_y, t1.g_w, t1.g_h);
+            }
+            wind_get(handle, WF_NEXTXYWH, &t1.g_x, &t1.g_y, &t1.g_w, &t1.g_h);
+        }
+        wind_update(END_UPDATE);
+        graf_mouse(M_ON, NULL);
+    }
 };
+
 
 
 bool GEMApplication::handle_window_message(short *msgbuff)

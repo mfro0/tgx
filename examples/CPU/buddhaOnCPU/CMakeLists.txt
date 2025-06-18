@@ -51,7 +51,7 @@ include_directories("../../../src/")
 file(GLOB tgx_SRC "../../../src/*.cpp") 
 
 # add the project files.
-file(GLOB project_SRC "buddha.h" "buddhaOnCPU.cpp")
+file(GLOB project_SRC "buddha.h" "buddhaOnCPU.cpp" "GEMApplication.h" "GEMApplication.cpp" "Window.h" "Window.cpp")
 
 # build an executable
 add_executable(${PROJECT_NAME} ${project_SRC} ${tgx_SRC})
