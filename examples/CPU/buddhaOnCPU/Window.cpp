@@ -7,15 +7,15 @@
 
 extern GEMApplication* theApplication;
 
-Window::Window(short kind, short x, short y, short w, short h) {
+Window::Window(short kind, GRECT r) {
     this->kind = kind;
-    wind_calc(WC_BORDER, kind, x, y, w, h, &x, &y, &w, &h);
-    handle = wind_create(kind, x, y, w, h);
-    wind_open(handle, x, y, w, h);
+    wind_calc_grect(WC_BORDER, kind, &r, &r);
+    handle = wind_create_grect(kind, &r);
+    wind_open_grect(handle, &r);
     
-    rect = {x, y, w, h};
-    wind_calc(WC_WORK, kind, x, y, w, h, &x, &y, &w, &h);
-    work = {x, y, w, h};
+    rect = r;
+    wind_calc_grect(WC_WORK, kind, &r, &r);
+    work = r;
     
     open = true;
     theApplication->windows.insert(std::pair<short, Window*>(handle, this));
@@ -41,27 +41,27 @@ void Window::full(void) {
     wind_get_grect(handle, WF_CURRXYWH, &rect);
 };
 
-void Window::size(short x, short y, short w, short h)
+void Window::size(GRECT r)
 {
     const short MIN_WIDTH = 100;
     const short MIN_HEIGHT = 100;
     
-    if (w < MIN_WIDTH)
+    if (r.g_w < MIN_WIDTH)
     {
-        w = MIN_WIDTH;
+        r.g_w = MIN_WIDTH;
     }
     
-    if (h < MIN_HEIGHT)
+    if (r.g_h < MIN_HEIGHT)
     {
-        h = MIN_HEIGHT;
+        r.g_h = MIN_HEIGHT;
     }
 }
 
-void Window::draw(short x, short y, short w, short h)
+void Window::draw(GRECT r)
 {
 };
 
-void Window::clear(short x, short y, short w, short h)
+void Window::clear(GRECT r)
 {
     
 }
@@ -99,6 +99,7 @@ void Window::scroll()
         sl_hpos = 1000L * top / (dh - work.g_h);
     sl_hpos = sl_hpos > 1000 ? 1000 : sl_hpos;
     sl_hpos = sl_hpos < 0 ? 0 : sl_hpos;
+    
     wind_set(handle, WF_HSLIDE, sl_vpos, 0, 0, 0);
     wind_set(handle, WF_VSLIDE, sl_hpos, 0, 0, 0);
     wind_set(handle, WF_HSLSIZE, sl_hsz, 0, 0, 0);
@@ -111,12 +112,12 @@ void Window::timer()
 };
 
 
-bool Window::handle_message(short *msgbuff)
+bool Window::handle_message(short msgbuff[])
 {
     switch (msgbuff[0])
     {
     case WM_REDRAW:
-        draw(msgbuff[4], msgbuff[5], msgbuff[6], msgbuff[7]);
+        draw(GRECT{msgbuff[4], msgbuff[5], msgbuff[6], msgbuff[7]});
         break;
         
     case WM_ONTOP:
@@ -132,7 +133,7 @@ bool Window::handle_message(short *msgbuff)
     
     case WM_SIZED:
     case WM_MOVED:
-        size(msgbuff[4], msgbuff[5], msgbuff[6], msgbuff[7]);
+        size({msgbuff[4], msgbuff[5], msgbuff[6], msgbuff[7]});
         break;
     
     case WM_FULLED:
@@ -180,7 +181,7 @@ bool Window::handle_message(short *msgbuff)
         
         scroll();
         
-        do_redraw(work.g_x, work.g_y, work.g_w, work.g_h);
+        do_redraw(work);
         break;
     
     case WM_HSLID:
@@ -190,7 +191,7 @@ bool Window::handle_message(short *msgbuff)
             left = doc_width - work.g_w;
         scroll();
         
-        do_redraw(work.g_x, work.g_y, work.g_w, work.g_h);
+        do_redraw(work);
         break;
     
     case WM_VSLID:
@@ -200,12 +201,13 @@ bool Window::handle_message(short *msgbuff)
             top = doc_height - work.g_h;
         scroll();
         
-        do_redraw(work.g_x, work.g_y, work.g_w, work.g_h);
+        do_redraw(work);
         break;
         
     default:
         std::cout.setf(std::ios::hex);
         std::cout << "unknown window message " <<  msgbuff[0] << std::endl;
+        std::cout.setf(std::ios::fixed);
     }
     wind_update(END_UPDATE);
     return false;

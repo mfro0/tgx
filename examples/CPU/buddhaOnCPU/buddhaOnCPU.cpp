@@ -60,7 +60,7 @@ tgx::Renderer3D<tgx::RGB565> renderer;              // the 3D renderer (loads al
 class BuddhaWindow : public Window
 {
 public:
-    BuddhaWindow(short what, short x, short y, short w, short h) : Window(what, x, y, w, h)
+    BuddhaWindow(short what, GRECT r) : Window(what, r)
     {
         doc_width = LX;
         doc_height = LY;
@@ -70,7 +70,7 @@ public:
     ~BuddhaWindow(){
     }
     
-    virtual void draw(short wx, short wy, short ww, short wh)
+    virtual void draw(GRECT r)
     {
         MFDB src_mfdb = {
             .fd_addr= im_buffer,
@@ -89,8 +89,7 @@ public:
             .fd_addr = NULL     // nothing else required if target is screen
         };
         
-        short x, y, w, h;
-        wind_get(handle, WF_WORKXYWH, &x, &y, &w, &h);
+        wind_get_grect(handle, WF_WORKXYWH, &r);
         
         short pxy[] = {
             static_cast<short>(left),
@@ -102,33 +101,33 @@ public:
             static_cast<short>(work.g_y + work.g_h - 1)
         };
         
-        theApplication->set_clipping(theApplication->vh(), wx, wy , ww, wh, 1);
+        theApplication->set_clipping(theApplication->vh(), r, 1);
         vro_cpyfm(theApplication->vh(), S_ONLY, pxy, &src_mfdb, &dst_mfdb);
     }
     
     virtual void timer(void)
     {
-        do_redraw(work.g_x, work.g_y, work.g_w, work.g_h);
+        do_redraw(work);
     }
     
-    virtual void size(short x, short y, short w, short h) {
+    virtual void size(GRECT r) {
         // move this into BuddhaWindow::size()
         // don't let the window size become larger than our drawing canvas
-        GRECT r = GRECT{x, y, w, h};
+        
         wind_calc_grect(WC_WORK, kind, &r, &work);
         if (work.g_w > LX) work.g_w = LX;
         if (work.g_h > LY) work.g_h = LY;
-        wind_calc(WC_BORDER, kind, work.g_x, work.g_y, work.g_w, work.g_h, &x, &y, &w, &h);
+        wind_calc_grect(WC_BORDER, kind, &work, &r);
         
-        wind_set(handle, WF_CURRXYWH, x, y, w, h);
+        wind_set_grect(handle, WF_CURRXYWH, &r);
         wind_get_grect(handle, WF_WORKXYWH, &work);
         wind_get_grect(handle, WF_CURRXYWH, &rect);
         scroll(); /* fix slider sizes and positions */
     }
     
-    void do_redraw(short xc, short yc, short wc, short hc)
+    void do_redraw(GRECT r)
     {
-        GRECT t1, t2 = {xc, yc, wc, hc};
+        GRECT t1, t2 = r;
         graf_mouse(M_OFF, 0);
         
         static float angle = -45.0f;
@@ -144,16 +143,16 @@ public:
         renderer.drawMesh(&buddha, false); // and then draw it !
         //renderer.drawMesh(&teapot_1, false);
         //renderer.drawMesh(&teapot_2, false);
-        wind_get(handle, WF_FIRSTXYWH, &t1.g_x, &t1.g_y, &t1.g_w, &t1.g_h);
+        wind_get_grect(handle, WF_FIRSTXYWH, &t1);
         
         while (t1.g_w || t1.g_h)
         {
             if (rc_intersect(&t2, &t1))
             {
-                theApplication->set_clipping(theApplication->vh(), t1.g_x, t1.g_y, t1.g_w, t1.g_h, 1);
-                draw(t1.g_x, t1.g_y, t1.g_w, t1.g_h);
+                theApplication->set_clipping(theApplication->vh(), t1, 1);
+                draw(t1);
             }
-            wind_get(handle, WF_NEXTXYWH, &t1.g_x, &t1.g_y, &t1.g_w, &t1.g_h);
+            wind_get_grect(handle, WF_NEXTXYWH, &t1);
         }
         wind_update(END_UPDATE);
         graf_mouse(M_ON, NULL);
@@ -191,8 +190,8 @@ int main()
     BuddhaWindow wi(NAME | SIZER | MOVER | CLOSER | FULLER |
                     HSLIDE | VSLIDE |
                     UPARROW | DNARROW | LFARROW | RTARROW,
-                    100,  40, 100 + 200 - 1, 40 + 200 - 1);
-    wi.size(100, 40, 100 + 200 - 1, 40 + 200 - 1);
+                    {100,  40, 100 + 200 - 1, 40 + 200 - 1});
+    wi.size(GRECT{100, 40, 100 + 200 - 1, 40 + 200 - 1});
     
     theApplication->event_loop();
 }

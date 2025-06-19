@@ -24,14 +24,14 @@ constexpr PXY GEMApplication::wh(void)
     return ret;
 }
 
-void GEMApplication::set_clipping(short handle, short x, short y, short w, short h, short on)
+void GEMApplication::set_clipping(short handle, GRECT r, bool on)
 {
     short clip[4];
     
-    clip[0] = x;
-    clip[1] = y;
-    clip[2] = clip[0] + w - 1;
-    clip[3] = clip[1] + h - 1;
+    clip[0] = r.g_x;
+    clip[1] = r.g_y;
+    clip[2] = clip[0] + r.g_w - 1;
+    clip[3] = clip[1] + r.g_h - 1;
     
     vs_clip(handle, on, clip);
 }
@@ -55,7 +55,7 @@ void GEMApplication::event_loop(void) {
     short keystate;
     short keyreturn;
     short mbreturn;
-    long msec = 20;
+    long msec = 10;
     
     do
     {

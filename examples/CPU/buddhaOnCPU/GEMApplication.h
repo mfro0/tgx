@@ -21,7 +21,7 @@ public:
     
     void event_loop(void);
     
-    void set_clipping(short handle, short x, short y, short w, short h, short on);
+    void set_clipping(short handle, GRECT r, bool on);
     
     std::unordered_map<short, Window*> windows;
     
