@@ -89,8 +89,6 @@ public:
             .fd_addr = NULL     // nothing else required if target is screen
         };
         
-        wind_get_grect(handle, WF_WORKXYWH, &r);
-        
         short pxy[] = {
             static_cast<short>(left),
             static_cast<short>(top),
@@ -111,7 +109,6 @@ public:
     }
     
     virtual void size(GRECT r) {
-        // move this into BuddhaWindow::size()
         // don't let the window size become larger than our drawing canvas
         
         wind_calc_grect(WC_WORK, kind, &r, &work);
@@ -149,7 +146,7 @@ public:
         {
             if (rc_intersect(&t2, &t1))
             {
-                theApplication->set_clipping(theApplication->vh(), t1, 1);
+                theApplication->set_clipping(theApplication->vh(), t1, true);
                 draw(t1);
             }
             wind_get_grect(handle, WF_NEXTXYWH, &t1);
