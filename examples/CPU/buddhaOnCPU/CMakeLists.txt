@@ -34,12 +34,17 @@ cmake_minimum_required(VERSION 3.10)
 
 project(buddhaOnCPU)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mcpu=68030")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mcpu=68030")
-set(CMAKE_LD_FLAGS "${CMAKE_LD_FLAGS} -mcpu=68030")
-#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mcpu=547x")
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mcpu=547x")
-#set(CMAKE_LD_FLAGS "${CMAKE_LD_FLAGS} -mcpu=547x")
+
+
+if (CMAKE_BUILD_TYPE STREQUAL "Coldfire")
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mcpu=547x")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mcpu=547x")
+	set(CMAKE_LD_FLAGS "${CMAKE_LD_FLAGS} -mcpu=547x")
+else (CMAKE_BUILD_TYPE NOT STREQUAL "Coldfire")
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mcpu=68030")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mcpu=68030")
+	set(CMAKE_LD_FLAGS "${CMAKE_LD_FLAGS} -mcpu=68030")
+endif ()
 
 # release is the default build type
 if (NOT CMAKE_BUILD_TYPE)
